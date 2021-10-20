@@ -6,32 +6,15 @@ Object.defineProperty(exports, '__esModule', { value: true });
 exports.getHuffmanTaptreeRoot = exports.tapTweakPubkey = exports.hashTapBranch = exports.hashTapLeaf = exports.serializeScriptSize = exports.aggregateMuSigPubkeys = exports.trimFirstByte = void 0;
 const assert = require('assert');
 const FastPriorityQueue = require('fastpriorityqueue');
-const bcrypto = require('./crypto');
 const varuint = require('varuint-bitcoin');
 const ecc = require('tiny-secp256k1');
+const taggedHash_1 = require('./taggedHash');
 /**
  * The 0x02 prefix indicating an even Y coordinate which is implicitly assumed
  * on all 32 byte x-only pub keys as defined in BIP340.
  */
 const EVEN_Y_COORD_PREFIX = new Uint8Array([0x02]);
 const INITIAL_TAPSCRIPT_VERSION = new Uint8Array([0xc0]);
-const TAGS = [
-  'TapLeaf',
-  'TapBranch',
-  'TapTweak',
-  'KeyAgg list',
-  'KeyAgg coefficient',
-];
-/** An object mapping tags to their tagged hash prefix of [SHA256(tag) | SHA256(tag)] */
-const TAGGED_HASH_PREFIXES = Object.fromEntries(
-  TAGS.map(tag => {
-    const tagHash = bcrypto.sha256(Buffer.from(tag));
-    return [tag, Buffer.concat([tagHash, tagHash])];
-  }),
-);
-function taggedHash(prefix, data) {
-  return bcrypto.sha256(Buffer.concat([TAGGED_HASH_PREFIXES[prefix], data]));
-}
 /**
  * Trims the leading 02/03 byte from an ECDSA pub key to get a 32 byte schnorr
  * pub key with x-only coordinates.
@@ -68,7 +51,10 @@ function aggregateMuSigPubkeys(pubkeys) {
   //
   // L = H(P_1 || P_2 || ... || P_n)
   // µ_i = H(L || P_i)
-  const L = taggedHash('KeyAgg list', Buffer.concat(trimmedPubkeys));
+  const L = (0, taggedHash_1.taggedHash)(
+    'KeyAgg list',
+    Buffer.concat(trimmedPubkeys),
+  );
   const tweakedPubkeys = trimmedPubkeys.map((trimmedPubkey, index) => {
     const pubkey = Buffer.concat([EVEN_Y_COORD_PREFIX, trimmedPubkey]);
     if (index === 1) {
@@ -77,7 +63,7 @@ function aggregateMuSigPubkeys(pubkeys) {
       // appendix in the MuSig2 paper for details.
       return pubkey;
     }
-    const c = taggedHash(
+    const c = (0, taggedHash_1.taggedHash)(
       'KeyAgg coefficient',
       Buffer.concat([L, trimmedPubkey]),
     );
@@ -108,7 +94,7 @@ exports.serializeScriptSize = serializeScriptSize;
  */
 function hashTapLeaf(script) {
   const size = serializeScriptSize(script);
-  return taggedHash(
+  return (0, taggedHash_1.taggedHash)(
     'TapLeaf',
     Buffer.concat([INITIAL_TAPSCRIPT_VERSION, size, script]),
   );
@@ -124,7 +110,10 @@ exports.hashTapLeaf = hashTapLeaf;
 function hashTapBranch(child1, child2) {
   // sort the children lexicographically
   const sortedChildren = [child1, child2].sort(Buffer.compare);
-  return taggedHash('TapBranch', Buffer.concat(sortedChildren));
+  return (0, taggedHash_1.taggedHash)(
+    'TapBranch',
+    Buffer.concat(sortedChildren),
+  );
 }
 exports.hashTapBranch = hashTapBranch;
 /**
@@ -137,7 +126,7 @@ function tapTweakPubkey(pubkey, tapTreeRoot) {
   let tapTweak;
   if (tapTreeRoot) {
     const trimmedPubkey = trimFirstByte(pubkey);
-    tapTweak = taggedHash(
+    tapTweak = (0, taggedHash_1.taggedHash)(
       'TapTweak',
       Buffer.concat([trimmedPubkey, tapTreeRoot]),
     );
@@ -145,7 +134,7 @@ function tapTweakPubkey(pubkey, tapTreeRoot) {
     // If the spending conditions do not require a script path, the output key should commit to an
     // unspendable script path instead of having no script path.
     // https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#cite_note-22
-    tapTweak = taggedHash('TapTweak', pubkey);
+    tapTweak = (0, taggedHash_1.taggedHash)('TapTweak', pubkey);
   }
   const tweakedPubkey = ecc.pointAddScalar(pubkey, tapTweak);
   return trimFirstByte(tweakedPubkey);
