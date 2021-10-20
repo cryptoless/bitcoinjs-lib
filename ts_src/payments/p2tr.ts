@@ -56,6 +56,8 @@ export function p2tr(a: Payment, opts?: PaymentOpts): Payment {
         }),
       ),
       redeemIndex: typef.maybe(typef.Number), // Selects the redeem to spend
+
+      witness: typef.maybe(typef.arrayOf(typef.Buffer)),
     },
     a,
   );
@@ -117,6 +119,15 @@ export function p2tr(a: Payment, opts?: PaymentOpts): Payment {
     );
   });
 
+  const _witnessProgram = lazy.value(() => {
+    const output = a.output || o.output;
+    if (!output) return;
+
+    // we remove the first two bytes (OP_1 0x20) from the output script to
+    // extract the 32 byte witness program
+    return output.slice(2);
+  });
+
   const network = a.network || BITCOIN_NETWORK;
 
   const o: Payment = { network };
@@ -124,9 +135,8 @@ export function p2tr(a: Payment, opts?: PaymentOpts): Payment {
   lazy.prop(o, 'address', () => {
     if (!o.output) return;
 
-    // we remove the first two bytes (OP_1 0x20) from the output script to
     // only encode the 32 byte witness program as bech32m
-    const words = bech32m.toWords(o.output.slice(2));
+    const words = bech32m.toWords(_witnessProgram()!);
     words.unshift(0x01);
     return bech32m.encode(network.bech32, words);
   });
@@ -186,6 +196,11 @@ export function p2tr(a: Payment, opts?: PaymentOpts): Payment {
     const nameParts = ['p2tr'];
     return nameParts.join('-');
   });
+  lazy.prop(o, 'redeem', () => {
+    if (!a.redeems || a.redeemIndex === undefined) return;
+
+    return a.redeems[a.redeemIndex];
+  });
 
   // extended validation
   if (opts.validate) {
@@ -193,6 +208,36 @@ export function p2tr(a: Payment, opts?: PaymentOpts): Payment {
     if (a.output) {
       if (a.output[0] !== OPS.OP_1 || a.output[1] !== 0x20)
         throw new TypeError('Output is invalid');
+
+      if (a.address) {
+        // if we're passed both an output script and an address, ensure they match
+        const { data } = _address();
+        if (Buffer.compare(data, _witnessProgram()!) !== 0) {
+          throw new TypeError('mismatch between address & output');
+        }
+      }
+    }
+
+    if (a.witness) {
+      const witnessStack = taproot.removeAnnex(a.witness);
+      if (witnessStack.length === 0) {
+        throw new TypeError('witness stack cannot be empty');
+      } else if (witnessStack.length === 1) {
+        // if there's only a single element it should be a key path spend schnorr signature
+        if (!bscript.isCanonicalSchnorrSignature(witnessStack[0])) {
+          throw new TypeError(
+            'a single witness stack element must be a schnorr signature',
+          );
+        }
+      } else if (a.output) {
+        // more than one element indicates a script path spend, ensure that our witness stack
+        // contains a script that is included in our taproot pub key
+        if (!taproot.isValidTapscript(witnessStack, _witnessProgram()!)) {
+          throw new TypeError(
+            'tapscript & control block does not match witness program ',
+          );
+        }
+      }
     }
     if (a.redeems) {
       a.redeems.forEach(redeem => {

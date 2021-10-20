@@ -128,6 +128,16 @@
       "outputHex": "5120d8f4f1d18996db61bb1caf5423de25d8a1eee9c950d37e6ffa023012d5e62e0d"
     },
     {
+      "type": "taproot",
+      "witnessData": [
+        "e6e81bea57db6bed922afbc5fab65c61f546b6f467b8c3570b5478ba21851e57b00bef791cd06d58afebb883770d956afaf2a9a796fb594a85d124b6837a4c7101",
+        "20dcd9a3fdad900e39ff367823f5d683135238d04425ac8dce19d0220e5791c700ac",
+        "c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+      ],
+      "output": "OP_1 3d3e6d002d642acf8653bcf26b81dbe656df5bf88b6d54221b2606bc78f3d4e6",
+      "outputHex": "51203d3e6d002d642acf8653bcf26b81dbe656df5bf88b6d54221b2606bc78f3d4e6"
+    },
+    {
       "type": "nulldata",
       "data": [
         "06deadbeef03f895a2ad89fb6d696497af486cb7c644a27aa568c7a18dd06113401115185474"

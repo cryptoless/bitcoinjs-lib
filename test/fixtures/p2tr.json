@@ -141,7 +141,52 @@
         "name": "p2tr",
         "output": "OP_1 618d4140bbf980976a0f4d2ff9bb05a6772866840770452ff405148b872f0dc8"
       }
+    },
+    {
+      "description": "p2tr OP_CHECKSIG script path spend",
+      "arguments": {
+        "witness": [
+          "e6e81bea57db6bed922afbc5fab65c61f546b6f467b8c3570b5478ba21851e57b00bef791cd06d58afebb883770d956afaf2a9a796fb594a85d124b6837a4c7101",
+          "20dcd9a3fdad900e39ff367823f5d683135238d04425ac8dce19d0220e5791c700ac",
+          "c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+        ],
+        "output": "OP_1 3d3e6d002d642acf8653bcf26b81dbe656df5bf88b6d54221b2606bc78f3d4e6",
+        "network": "testnet"
+      },
+      "options": {},
+      "expected": {
+        "name": "p2tr"
+      }
     }
   ],
-  "invalid": []
+  "invalid": [
+    {
+      "description": "p2tr OP_CHECKSIG script path spend with script missing from tap tree",
+      "arguments": {
+        "witness": [
+          "e6e81bea57db6bed922afbc5fab65c61f546b6f467b8c3570b5478ba21851e57b00bef791cd06d58afebb883770d956afaf2a9a796fb594a85d124b6837a4c7101",
+          "204d4b27ab455a6e2b03af29a141ef47fc579c8435f563c065bf0dd12e6180ccd4ac",
+          "c150929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0"
+        ],
+        "output": "OP_1 3d3e6d002d642acf8653bcf26b81dbe656df5bf88b6d54221b2606bc78f3d4e6",
+        "network": "testnet"
+      },
+      "options": {},
+      "expected": {
+        "name": "p2tr"
+      }
+    },
+    {
+      "description": "p2tr, testnet address with mismatched output",
+      "arguments": {
+        "address": "tb1p6h5fuzmnvpdthf5shf0qqjzwy7wsqc5rhmgq2ks9xrak4ry6mtrscsqvzp",
+        "output": "OP_1 618d4140bbf980976a0f4d2ff9bb05a6772866840770452ff405148b872f0dc8",
+        "network": "testnet"
+      },
+      "options": {},
+      "expected": {
+        "name": "p2tr"
+      }
+    }
+  ]
 }
