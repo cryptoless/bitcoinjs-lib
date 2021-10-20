@@ -19,7 +19,7 @@ Object.defineProperty(exports, '__esModule', { value: true });
 exports.signSchnorrWithoutExtraData = exports.signSchnorr = exports.verifySchnorr = exports.isXOnlyPoint = void 0;
 const BN = require('bn.js');
 const elliptic_1 = require('elliptic');
-const { createHash } = require('crypto');
+const taggedHash_1 = require('./taggedHash');
 const secp256k1 = new elliptic_1.ec('secp256k1');
 const ZERO32 = Buffer.alloc(32, 0);
 const EC_GROUP_ORDER = Buffer.from(
@@ -53,22 +53,6 @@ function isPrivate(x) {
   ); // < G
 }
 const TWO = new BN(2);
-function sha256(message) {
-  return createHash('sha256')
-    .update(message)
-    .digest();
-}
-// TODO(BG-37835): consolidate with taggedHash in `p2tr.ts`
-function taggedHash(tagString, msg) {
-  if (typeof tagString !== 'string') {
-    throw new TypeError('invalid argument');
-  }
-  if (!Buffer.isBuffer(msg)) {
-    throw new TypeError('invalid argument');
-  }
-  const tagHash = sha256(Buffer.from(tagString, 'utf8'));
-  return sha256(Buffer.concat([tagHash, tagHash, msg]));
-}
 function decodeXOnlyPoint(bytes) {
   if (!Buffer.isBuffer(bytes) || bytes.length !== 32) {
     throw new Error('invalid pubkey');
@@ -127,7 +111,7 @@ function verifySchnorr(hash, q, signature) {
   const r = fromBuffer(signature.slice(0, 32));
   const s = fromBuffer(signature.slice(32, 64));
   const e = fromBuffer(
-    taggedHash(
+    (0, taggedHash_1.taggedHash)(
       'BIP0340/challenge',
       Buffer.concat([signature.slice(0, 32), q, hash]),
     ),
@@ -150,10 +134,10 @@ function __signSchnorr(hash, d, extraData) {
   const P = G.mul(dd);
   dd = hasEvenY(P) ? dd : n.sub(dd);
   const t = extraData
-    ? dd.xor(fromBuffer(taggedHash('BIP0340/aux', extraData)))
+    ? dd.xor(fromBuffer((0, taggedHash_1.taggedHash)('BIP0340/aux', extraData)))
     : dd;
   const k0 = fromBuffer(
-    taggedHash(
+    (0, taggedHash_1.taggedHash)(
       'BIP0340/nonce',
       Buffer.concat([toBuffer(t), encodeXOnlyPoint(P), hash]),
     ),
@@ -169,7 +153,7 @@ function __signSchnorr(hash, d, extraData) {
   }
   const k = hasEvenY(R) ? k0 : n.sub(k0);
   const e = fromBuffer(
-    taggedHash(
+    (0, taggedHash_1.taggedHash)(
       'BIP0340/challenge',
       Buffer.concat([encodeXOnlyPoint(R), encodeXOnlyPoint(P), hash]),
     ),
