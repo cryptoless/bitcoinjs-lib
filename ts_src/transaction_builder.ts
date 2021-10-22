@@ -146,13 +146,13 @@ export class TransactionBuilder {
     this.__TX = new Transaction();
     this.__TX.version = 2;
     this.__USE_LOW_R = false;
-    console.warn(
-      'Deprecation Warning: TransactionBuilder will be removed in the future. ' +
-        '(v6.x.x or later) Please use the Psbt class instead. Examples of usage ' +
-        'are available in the transactions-psbt.js integration test file on our ' +
-        'Github. A high level explanation is available in the psbt.ts and psbt.js ' +
-        'files as well.',
-    );
+    // console.warn(
+    //   'Deprecation Warning: TransactionBuilder will be removed in the future. ' +
+    //     '(v6.x.x or later) Please use the Psbt class instead. Examples of usage ' +
+    //     'are available in the transactions-psbt.js integration test file on our ' +
+    //     'Github. A high level explanation is available in the psbt.ts and psbt.js ' +
+    //     'files as well.',
+    // );
   }
 
   setLowR(setting?: boolean): boolean {
@@ -240,6 +240,37 @@ export class TransactionBuilder {
 
   buildIncomplete(): Transaction {
     return this.__build(true);
+  }
+
+  getSigningData(
+    vin: number,
+    ourPubKey: Buffer,
+    redeemScript?: Buffer,
+    hashType?: number,
+    witnessValue?: number,
+    witnessScript?: Buffer,
+  ): Omit<SigningData, 'keyPair'> {
+    return getPubKeySigningData(
+      vin,
+      ourPubKey,
+      this.__INPUTS,
+      this.__needsOutputs.bind(this),
+      this.__TX,
+      redeemScript,
+      hashType,
+      witnessValue,
+      witnessScript,
+      this.__USE_LOW_R,
+    );
+  }
+
+  signInput(
+    vin: number,
+    ourPubKey: Buffer,
+    signature: Buffer,
+    hashType: number,
+  ): void {
+    signInput(vin, ourPubKey, this.__INPUTS, signature, hashType);
   }
 
   sign(
@@ -1190,6 +1221,37 @@ function trySign({
     }
 
     const signature = keyPair.sign(signatureHash, useLowR);
+    console.log(
+      `signature = ${signature.toString('hex')}, hashType = ${hashType}`,
+    );
+    input.signatures![i] = bscript.signature.encode(signature, hashType);
+    signed = true;
+  }
+
+  if (!signed) throw new Error('Key pair cannot sign for this input');
+}
+
+function signInput(
+  vin: number,
+  ourPubKey: Buffer,
+  inputs: TxbInput[],
+  signature: Buffer,
+  hashType: number,
+): void {
+  if (!inputs[vin]) throw new Error('No input at index: ' + vin);
+  const input = inputs[vin];
+  // enforce in order signing of public keys
+  let signed = false;
+  for (const [i, pubKey] of input.pubkeys!.entries()) {
+    if (!ourPubKey.equals(pubKey!)) continue;
+    if (input.signatures![i]) throw new Error('Signature already exists');
+
+    // TODO: add tests
+    if (ourPubKey.length !== 33 && input.hasWitness) {
+      throw new Error(
+        'BIP143 rejects uncompressed public keys in P2WPKH or P2WSH',
+      );
+    }
     input.signatures![i] = bscript.signature.encode(signature, hashType);
     signed = true;
   }
@@ -1249,6 +1311,40 @@ function getSigningData(
   // TODO: remove keyPair.network matching in 4.0.0
   if (keyPair.network && keyPair.network !== network)
     throw new TypeError('Inconsistent network');
+
+  const ourPubKey =
+    keyPair.publicKey || (keyPair.getPublicKey && keyPair.getPublicKey());
+
+  const signingData = getPubKeySigningData(
+    vin,
+    ourPubKey,
+    inputs,
+    needsOutputs,
+    tx,
+    redeemScript,
+    hashType,
+    witnessValue,
+    witnessScript,
+    useLowR,
+  );
+  return {
+    ...signingData,
+    keyPair,
+  };
+}
+
+function getPubKeySigningData(
+  vin: number,
+  ourPubKey: Buffer,
+  inputs: TxbInput[],
+  needsOutputs: HashTypeCheck,
+  tx: Transaction,
+  redeemScript?: Buffer,
+  hashType?: number,
+  witnessValue?: number,
+  witnessScript?: Buffer,
+  useLowR?: boolean,
+): Omit<SigningData, 'keyPair'> {
   if (!inputs[vin]) throw new Error('No input at index: ' + vin);
 
   hashType = hashType || Transaction.SIGHASH_ALL;
@@ -1265,8 +1361,6 @@ function getSigningData(
     throw new Error('Inconsistent redeemScript');
   }
 
-  const ourPubKey =
-    keyPair.publicKey || (keyPair.getPublicKey && keyPair.getPublicKey());
   if (!canSign(input)) {
     if (witnessValue !== undefined) {
       if (input.value !== undefined && input.value !== witnessValue)
@@ -1310,7 +1404,6 @@ function getSigningData(
   return {
     input,
     ourPubKey,
-    keyPair,
     signatureHash,
     hashType,
     useLowR: !!useLowR,
